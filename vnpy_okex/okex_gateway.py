@@ -14,7 +14,7 @@ import time
 from copy import copy
 from datetime import datetime
 from urllib.parse import urlencode
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 from types import TracebackType
 
 from requests import Response
@@ -54,15 +54,15 @@ from vnpy_websocket import WebsocketClient
 CHINA_TZ: timezone = timezone("Asia/Shanghai")
 
 # 实盘和模拟盘REST API地址
-REST_HOST: str = "https://www.okex.com"
+REST_HOST: str = "https://www.okx.com/"
 
 # 实盘Websocket API地址
-PUBLIC_WEBSOCKET_HOST: str = "wss://ws.okex.com:8443/ws/v5/public"
-PRIVATE_WEBSOCKET_HOST: str = "wss://ws.okex.com:8443/ws/v5/private"
+PUBLIC_WEBSOCKET_HOST: str = "wss://ws.okx.com:8443/ws/v5/public"
+PRIVATE_WEBSOCKET_HOST: str = "wss://ws.okx.com:8443/ws/v5/private"
 
 # 模拟盘Websocket API地址
-TEST_PUBLIC_WEBSOCKET_HOST: str = "wss://wspap.okex.com:8443/ws/v5/public?brokerId=9999"
-TEST_PRIVATE_WEBSOCKET_HOST: str = "wss://wspap.okex.com:8443/ws/v5/private?brokerId=9999"
+TEST_PUBLIC_WEBSOCKET_HOST: str = "wss://wspap.okx.com:8443/ws/v5/public?brokerId=9999"
+TEST_PRIVATE_WEBSOCKET_HOST: str = "wss://wspap.okx.com:8443/ws/v5/private?brokerId=9999"
 
 # 委托状态映射
 STATUS_OKEX2VT: Dict[str, Status] = {
@@ -121,16 +121,18 @@ class OkexGateway(BaseGateway):
     vn.py用于对接OKEX统一账户的交易接口。
     """
 
-    default_setting: Dict[str, Any] = {
+    default_setting = {
         "API Key": "",
         "Secret Key": "",
         "Passphrase": "",
+        "会话数": 3,
         "代理地址": "",
         "代理端口": "",
         "服务器": ["REAL", "TEST"]
     }
 
-    exchanges: Exchange = [Exchange.OKEX]
+    # exchanges = [Exchange.OKEX]
+    exchanges = ["OKEX"]
 
     def __init__(self, event_engine: EventEngine, gateway_name: str = "OKEX") -> None:
         """构造函数"""
@@ -150,6 +152,7 @@ class OkexGateway(BaseGateway):
         proxy_host: str = setting["代理地址"]
         proxy_port: str = setting["代理端口"]
         server: str = setting["服务器"]
+        session_number: str = setting["会话数"]
 
         if proxy_port.isdigit():
             proxy_port = int(proxy_port)
@@ -160,6 +163,7 @@ class OkexGateway(BaseGateway):
             key,
             secret,
             passphrase,
+            session_number,
             proxy_host,
             proxy_port,
             server
@@ -266,6 +270,7 @@ class OkexRestApi(RestClient):
         key: str,
         secret: str,
         passphrase: str,
+        session_number: int,
         proxy_host: str,
         proxy_port: int,
         server: str
@@ -281,7 +286,7 @@ class OkexRestApi(RestClient):
         self.connect_time = int(datetime.now().strftime("%y%m%d%H%M%S"))
 
         self.init(REST_HOST, proxy_host, proxy_port)
-        self.start()
+        self.start(session_number)
         self.gateway.write_log("REST API启动成功")
 
         self.query_time()
@@ -380,7 +385,7 @@ class OkexRestApi(RestClient):
                 for bar_list in data["data"]:
                     ts, o, h, l, c, vol, _ = bar_list
                     dt = parse_timestamp(ts)
-                    bar: BarData = BarData(
+                    bar = BarData(
                         symbol=req.symbol,
                         exchange=req.exchange,
                         datetime=dt,
@@ -702,7 +707,7 @@ class OkexWebsocketPrivateApi(WebsocketClient):
 
     def on_order(self, packet: dict) -> None:
         """委托更新推送"""
-        data: list = packet["data"]
+        data = packet["data"]
         for d in data:
             order: OrderData = parse_order_data(d, self.gateway_name)
             self.gateway.on_order(order)
@@ -773,7 +778,7 @@ class OkexWebsocketPrivateApi(WebsocketClient):
         # 请求本身格式错误（没有委托的回报数据）
         if packet["code"] != "0":
             if not data:
-                order: OrderData = self.reqid_order_map[packet["id"]]
+                order = self.reqid_order_map[packet["id"]]
                 order.status = Status.REJECTED
                 self.gateway.on_order(order)
                 return
@@ -784,8 +789,8 @@ class OkexWebsocketPrivateApi(WebsocketClient):
             if code == "0":
                 return
 
-            orderid: str = d["clOrdId"]
-            order: OrderData = self.gateway.get_order(orderid)
+            orderid = d["clOrdId"]
+            order = self.gateway.get_order(orderid)
             if not order:
                 return
             order.status = Status.REJECTED
@@ -835,7 +840,7 @@ class OkexWebsocketPrivateApi(WebsocketClient):
 
     def subscribe_topic(self) -> None:
         """订阅委托、资金和持仓推送"""
-        okex_req: dict = {
+        okex_req = {
             "op": "subscribe",
             "args": [
                 {
@@ -938,7 +943,7 @@ def parse_timestamp(timestamp: str) -> datetime:
 
 def get_float_value(data: dict, key: str) -> float:
     """获取字典中对应键的浮点数值"""
-    data_str: str = data.get(key, "")
+    data_str = data.get(key, "")
     if not data_str:
         return 0.0
     return float(data_str)
@@ -952,7 +957,7 @@ def parse_order_data(data: dict, gateway_name: str) -> OrderData:
     else:
         order_id: str = data["ordId"]
 
-    order: OrderData = OrderData(
+    order = OrderData(
         symbol=data["instId"],
         exchange=Exchange.OKEX,
         type=ORDERTYPE_OKEX2VT[data["ordType"]],
