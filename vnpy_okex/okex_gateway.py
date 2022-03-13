@@ -89,6 +89,7 @@ DIRECTION_VT2OKEX: Dict[Direction, str] = {v: k for k, v in DIRECTION_OKEX2VT.it
 
 # 数据频率映射
 INTERVAL_VT2OKEX: Dict[Interval, str] = {
+    Interval.TICK: 'tick',
     Interval.MINUTE: "1m",
     Interval.HOUR: "1H",
     Interval.DAILY: "1D",
@@ -120,6 +121,7 @@ class OkexGateway(BaseGateway):
     """
     vn.py用于对接OKEX统一账户的交易接口。
     """
+    gateway_name = 'OKEX'
 
     default_setting = {
         "API Key": "",
@@ -141,7 +143,6 @@ class OkexGateway(BaseGateway):
         self.rest_api: "OkexRestApi" = OkexRestApi(self)
         self.ws_public_api: "OkexWebsocketPublicApi" = OkexWebsocketPublicApi(self)
         self.ws_private_api: "OkexWebsocketPrivateApi" = OkexWebsocketPrivateApi(self)
-
         self.orders: Dict[str, OrderData] = {}
 
     def connect(self, setting: dict) -> None:
